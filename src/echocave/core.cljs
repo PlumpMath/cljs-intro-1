@@ -4,11 +4,12 @@
             [clojure.browser.repl :as repl]
             [crate.core :as crate]
             [jayq.core :refer [$ append inner on] :as jq]
-            )
+            [echocave.net :as net :refer [GET jsonp-chan]]
+            [echocave.utils :as utils :refer [log]])
   (:require-macros
     [cljs.core.async.macros :refer [go alt!]]))
 
-;; (repl/connect "http://localhost:9000/repl")
+; (repl/connect "http://localhost:9000/repl")
 
 ;; (js/console.log (+ 2 2))
 
@@ -42,9 +43,20 @@
 
 (append ($ :#root) (crate/html mainpage))
 
-(js/console.log "test")
-(let [ch (click-chan :#main-board {:hi "hi"})]
+;; (let [ch (click-chan :#main-board {:hi "hi"})]
+;;   (go
+;;    (while true
+;;       (let [got (<! ch)]
+;;         (js/console.log got)))))
+
+;; (go (let [ret (<! (jsonp-chan "http://developer.echonest.com/api/v4/artist/profile?api_key=DD9P0OV9OYFH1LCAE&id=ARH6W4X1187B99274F&format=jsonp&callback=callback"))]
+;;       (log (js->clj ret)))
+;;     )
+
+;(net/artist-radio "Weezer")
+
+(let [ids (net/artist-radio-songs "Noah and the Whale")]
   (go
    (while true
-      (let [got (<! ch)]
-        (js/console.log got)))))
+     (log "Got out: " (<! (net/fetch-song-analysis ids)))
+     )))
