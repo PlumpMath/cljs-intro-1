@@ -11,10 +11,14 @@
 
 ; (repl/connect "http://localhost:9000/repl")
 
-;; (js/console.log (+ 2 2))
+(def raf
+  (or (.-requestAnimationFrame js/window)
+      (.-webkitRequestAnimationFrame js/window)
+      (.-mozRequestAnimationFrame js/window)
+      (.-oRequestAnimationFrame js/window)
+      (.-msRequestAnimationFrame js/window)
+      (fn [callback] (js/setTimeout callback 17))))
 
-;; (js/console.log  (crate/html [:p.hi "HELLO"]))
-;;                                        ;(append ($ "#root") (crate/html [:p.hi "HEY"]))
 
 (defn click-chan [selector msg-name]
   (let [rc (chan)
@@ -43,20 +47,11 @@
 
 (append ($ :#root) (crate/html mainpage))
 
-;; (let [ch (click-chan :#main-board {:hi "hi"})]
+;; (let [ids (net/artist-radio-songs "Noah and the Whale")]
 ;;   (go
 ;;    (while true
-;;       (let [got (<! ch)]
-;;         (js/console.log got)))))
+;;      (log "Got out: " (<! (net/fetch-song-analysis ids))))))
 
-;; (go (let [ret (<! (jsonp-chan "http://developer.echonest.com/api/v4/artist/profile?api_key=DD9P0OV9OYFH1LCAE&id=ARH6W4X1187B99274F&format=jsonp&callback=callback"))]
-;;       (log (js->clj ret)))
-;;     )
+; Main game loop
 
-;(net/artist-radio "Weezer")
 
-(let [ids (net/artist-radio-songs "Noah and the Whale")]
-  (go
-   (while true
-     (log "Got out: " (<! (net/fetch-song-analysis ids)))
-     )))
