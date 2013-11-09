@@ -14,3 +14,6 @@
 (set! *print-fn* js-print)
 
 (defn by-id [id] (dom/getElement id))
+
+(def board-width 1000)
+(def board-height 300)
