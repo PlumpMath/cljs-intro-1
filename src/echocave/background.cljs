@@ -45,7 +45,8 @@ based on an artist radio. magic!"
   (go
    (let [next (<! (:bg-chan game-state))
          ground-array (conj (:ground game-state) next)]
-     (if (> (count ground-array) utils/board-width)
-       (subvec ground-array (- (count ground-array) utils/board-width))
-       ground-array)
+     ;; (if (> (count ground-array) utils/board-width)
+     ;;   (subvec ground-array (- (count ground-array) utils/board-width))
+     ;;   ground-array)
+     (subvec ground-array 1)
      )))

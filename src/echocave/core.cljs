@@ -167,22 +167,16 @@
   (let [ctx (board-context)
         ground (:ground game-state)
         begin (first ground)
-        start-offset (get begin "start")
-        mult (/ 100 (get (last ground) "start"))]
+        lastx (atom 0.0)]
     (.beginPath ctx)
 ;    (log "Board is:" (:ground game-state))
     ;; Translate to 0 from initial
     (.moveTo ctx 0 (get "loudness_start" begin))
-    (doall (map-indexed (fn [idx segment]
-                          (let [loudness (Math/abs (get segment "loudness_start"))
-                                timing-adjusted (* mult (- (get segment "start") start-offset))]
-;                            (log "Drawing:" loudness timing-adjusted)
-                            (.lineTo ctx timing-adjusted loudness))
-                          
-;                          (log "rendering loudness" (:loudness_start segment))
-;                          (.lineTo ctx idx (+ 80 (:loudness_start segment)))
-                          )
-                        (rest ground)))
+    (doseq [segment (rest ground)]
+      (swap! lastx + (get segment "duration"))
+      (let [loudness (* 3.0 (Math/abs (get segment "loudness_start")))
+            loudness-bottom (- utils/board-height loudness)]
+        (.lineTo ctx @lastx loudness-bottom)))
     (.stroke ctx)
     ;; Draw the ship in its place
     (.drawImage ctx @ship (:shipx game-state) (:shipy game-state) 30 30)))
@@ -212,7 +206,7 @@
   (go
    (log "Filling board")
    (let [board (atom (:ground game-state))]
-     (while (< (count @board) utils/board-width)
+     (while (< (count @board) (* 4 utils/board-width))
        (swap! board conj (<! (:bg-chan game-state))))
      (assoc game-state :ground @board))))
 
