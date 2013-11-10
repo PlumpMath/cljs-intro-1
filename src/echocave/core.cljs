@@ -6,7 +6,7 @@
             [jayq.core :refer [$ append inner on] :as jq]
             [echocave.net :as net :refer [GET jsonp-chan]]
             [echocave.utils :as utils :refer [log board-width board-height ship-height ship-width merge-chans]]
-            [echocave.background :as bg :refer [ground-chan update-ground]]
+            [echocave.background :as bg :refer [ground-chan update-ground make-ground-chan fill-ground]]
             )
   (:require-macros
     [cljs.core.async.macros :refer [go alt!]]))
@@ -70,7 +70,7 @@
     [:h1 "Play the game!"]
     [:div#controls
      "Enter an artist: "
-     [:input]
+     [:input.artist-name]
      [:button.new-game {:href "#"} "New Game"]
      [:button.end-game "End Game"]]]
    [:canvas#main-board {:width utils/board-width :height utils/board-height}]])
@@ -112,8 +112,9 @@
 ;; Initial game state
 ;; TODO real data, initialize randomly for now
 (def ^:export initial-game-state
-  {:ground (vec (take utils/board-width
-                      (repeatedly #(- utils/board-height (rand-int (* 0.40 utils/board-height))))))
+  {:ground []
+   ;; (vec (take utils/board-width
+   ;;                    (repeatedly #(- utils/board-height (rand-int (* 0.40 utils/board-height))))))
    :shipx 0
    :shipy 0})
 
@@ -153,9 +154,9 @@
        (when (= c comm-chan) ; Got a key down
          (swap! s move-ship v)))
      ;; Shift the ground to the left
-     (swap! s assoc :ground (<! (bg/update-ground (:ground game-state))))
+     (swap! s assoc :ground (<! (bg/update-ground game-state)))
      ;; Check for collisions
-     (check-collisions game-state game-chan)
+;     (check-collisions game-state game-chan)
      @s)))
 
 (defn render-board
@@ -164,11 +165,23 @@
   (clear-board)
   ;; Draw path for ground, through all the :ground datapoints
   (let [ctx (board-context)
-        ground (:ground game-state)]
+        ground (:ground game-state)
+        begin (first ground)
+        start-offset (get begin "start")
+        mult (/ 100 (get (last ground) "start"))]
     (.beginPath ctx)
-    (.moveTo ctx 0 (- utils/board-height (first ground)))
-    (doall (map-indexed (fn [idx height]
-                          (.lineTo ctx idx height))
+;    (log "Board is:" (:ground game-state))
+    ;; Translate to 0 from initial
+    (.moveTo ctx 0 (get "loudness_start" begin))
+    (doall (map-indexed (fn [idx segment]
+                          (let [loudness (Math/abs (get segment "loudness_start"))
+                                timing-adjusted (* mult (- (get segment "start") start-offset))]
+;                            (log "Drawing:" loudness timing-adjusted)
+                            (.lineTo ctx timing-adjusted loudness))
+                          
+;                          (log "rendering loudness" (:loudness_start segment))
+;                          (.lineTo ctx idx (+ 80 (:loudness_start segment)))
+                          )
                         (rest ground)))
     (.stroke ctx)
     ;; Draw the ship in its place
@@ -194,13 +207,29 @@
                         (= v :stop)))
        (raf #(game-loop game-state comm-chan game-chan))))))
 
+(defn fill-ground-2
+  [game-state]
+  (go
+   (log "Filling board")
+   (let [board (atom (:ground game-state))]
+     (while (< (count @board) utils/board-width)
+       (swap! board conj (<! (:bg-chan game-state))))
+     (assoc game-state :ground @board))))
+
 (let [comm-chan (chan)
       game-chan (utils/merge-chans (click-chan ".new-game" :start)
                                    (click-chan ".end-game" :stop))]
   (go
    (let [next-cmd (<! game-chan)]
      (when (= :start next-cmd)
-       (game-loop initial-game-state comm-chan game-chan))
+       (let [artist (.val ($ ':.artist-name))
+             bg-chan (bg/make-ground-chan artist)
+             game-state (assoc initial-game-state :bg-chan bg-chan)
+             game-state (<! (fill-ground-2 game-state))]
+         (log "Initial ground" (count (:ground game-state)))
+         (game-loop game-state
+                    comm-chan
+                    game-chan)))
      ))
   (bind-key-observer comm-chan))
 

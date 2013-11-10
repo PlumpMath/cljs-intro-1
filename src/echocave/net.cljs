@@ -43,7 +43,7 @@
           (>! song-ch (get song "id")))))
      song-ch))
 
-;; Returns a list of full songs from an artist radio
+;; Returns a channel of full songs from an artist radio
 (defn artist-radio-songs
   ([artist] (artist-radio-songs (chan) artist))
   ([out-ch artist]
@@ -66,12 +66,15 @@
   [song-ch]
   (let [out (chan)]
     (go
-     (doseq [song (<! song-ch)]
-       ;; Fetch analysis url if it's there
-       (when-let [url (-> song
-                       (get "audio_summary")
-                       (get "analysis_url"))]
-         (let [data (<! (GET url))
-               new-song (assoc-in song ["audio_summary" "analysis_result"] data)]
-           (>! out new-song)))))
+     (while true
+       (doseq [song (<! song-ch)]
+         ;; Fetch analysis url if it's there
+         (when-let [url (-> song
+                            (get "audio_summary")
+                            (get "analysis_url"))]
+           (let [data (<! (GET url))
+                 new-song (assoc-in song ["audio_summary" "analysis_result"] (js->clj (JSON/parse data)))]
+             (>! out new-song))))))
     out))
+
+
