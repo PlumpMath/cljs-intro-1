@@ -17,3 +17,6 @@
 
 (def board-width 1000)
 (def board-height 300)
+
+(def ship-width 30)
+(def ship-height 30)

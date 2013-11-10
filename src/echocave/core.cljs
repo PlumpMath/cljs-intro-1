@@ -5,7 +5,7 @@
             [crate.core :as crate]
             [jayq.core :refer [$ append inner on] :as jq]
             [echocave.net :as net :refer [GET jsonp-chan]]
-            [echocave.utils :as utils :refer [log board-width board-height]]
+            [echocave.utils :as utils :refer [log board-width board-height ship-height ship-width]]
             [echocave.background :as bg :refer [ground-chan update-ground]]
             )
   (:require-macros
@@ -50,14 +50,14 @@
 (defn bind-key-observer
   [command-chan]
   (go (while true
-        (<! (timeout 25))
+;        (<! (timeout 10))
         (case @current-key-down
           :up   (>! command-chan [:player/up])
           :down (>! command-chan [:player/down])
           :not-matched)))
   (.addEventListener js/window "keydown"
                      (fn [e]
-                       (.log js/console e)
+                       ;(.log js/console e)
                        (reset! current-key-down (key-event->command e))))
   (.addEventListener js/window "keyup"
                      (fn [e]
@@ -88,7 +88,7 @@
     (aset img "onload" (fn []
                          (log "Loaded ship")
                          (reset! ship img)
-                         (.drawImage (board-context) img 0 0 30 30)))))
+                         (.drawImage (board-context) img 0 0 utils/ship-width utils/ship-height)))))
 
 (def board
   [:div.board])
@@ -112,11 +112,33 @@
    :shipx 0
    :shipy 0})
 
+;; Direction is :player/up] or p:player/down]
+(defn move-ship
+  [game-state direction]
+  (condp = direction
+    [:player/up]
+    (let [newy (dec (:shipy game-state))]
+      (if (< newy 0)
+        game-state
+        (assoc game-state :shipy newy)))
+    [:player/down]
+    (let [newx (inc (:shipy game-state))]
+      (if (> (+ utils/ship-height newx) utils/board-height)
+        game-state
+        (assoc game-state :shipy newx)))
+    ))
+
 (defn update-game-state
-  [game-state]
-  ;; Shift the ground to the left
+  [game-state comm-chan]
   (go
-   (assoc game-state :ground (<! (bg/update-ground (:ground game-state))))))
+   (let [s (atom game-state)]
+     ;; Move ship if key is down
+     (let [[v c] (alts! [comm-chan (timeout 0)])]
+       (when (= c comm-chan) ; Got a key down
+         (swap! s move-ship v)))
+     ;; Shift the ground to the left
+     (swap! s assoc :ground (<! (bg/update-ground (:ground game-state))))
+     @s)))
 
 (defn render-board
   [game-state]
@@ -139,19 +161,18 @@
 ;; * Use rAF to get called every 17ms
 ;; *
 (defn mainloop
-  [game-state]
+  [game-state comm-chan]
   (go
    ;; Update game state
-   (let [game-state (<! (update-game-state game-state))]
+   (let [game-state (<! (update-game-state game-state comm-chan))]
      ;; Render updated board
      (render-board game-state)
-     (raf #(mainloop game-state))
-     )
+     (raf #(mainloop game-state comm-chan)))
    
-   ;; (let [done (<! (render-board game-state))]
-   ;;   (raf #(mainloop done)))
    ))
 
-(mainloop initial-game-state)
+(let [comm-chan (chan)]
+  (mainloop initial-game-state comm-chan)
+  (bind-key-observer comm-chan))
 
 
