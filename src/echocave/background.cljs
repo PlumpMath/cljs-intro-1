@@ -16,7 +16,8 @@
 
 ;; Just make it random for now
 (go
- (>! ground-chan (* (rand))) 20)
+ (while true
+   (>! ground-chan (rand-int (* 0.20 utils/board-height)))))
 
 (defn update-ground
   [ground-array]
@@ -24,4 +25,7 @@
    (let [next (<! ground-chan)
          ground-array (conj ground-array next)]
      (if (> (count ground-array) utils/board-width)
-       (subvec ground-array (- utils/board-width (count ground-array)))))))
+       (subvec ground-array (- (count ground-array) utils/board-width))
+       ground-array)
+     ))
+  )
