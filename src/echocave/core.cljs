@@ -5,7 +5,7 @@
             [crate.core :as crate]
             [jayq.core :refer [$ append inner on] :as jq]
             [echocave.net :as net :refer [GET jsonp-chan]]
-            [echocave.utils :as utils :refer [log board-width board-height ship-height ship-width]]
+            [echocave.utils :as utils :refer [log board-width board-height ship-height ship-width merge-chans]]
             [echocave.background :as bg :refer [ground-chan update-ground]]
             )
   (:require-macros
@@ -68,7 +68,11 @@
   [:div
    [:div#header
     [:h1 "Play the game!"]
-    [:a.new-game {:href "#"} "New Game"]]
+    [:div#controls
+     "Enter an artist: "
+     [:input]
+     [:button.new-game {:href "#"} "New Game"]
+     [:button.end-game "End Game"]]]
    [:canvas#main-board {:width utils/board-width :height utils/board-height}]])
 
 (defn board-context
@@ -173,8 +177,10 @@
 ;; Main game loop
 ;;
 ;; * Use rAF to get called every 17ms
-;; *
-(defn mainloop
+;; * Update game state
+;; * Render board
+;; * Check for end-of-game
+(defn game-loop
   [game-state comm-chan game-chan]
   (go
    ;; Update game state
@@ -182,12 +188,19 @@
          [v c] (alts! [game-chan (timeout 0)])]
      ;; Render updated board
      (render-board game-state)
-    (when-not (and (= c game-chan)
-                   (= v :gameover))
-      (raf #(mainloop game-state comm-chan game-chan))))))
+     ;; Check for end of game, either by user ending or collision
+     (when-not (and (= c game-chan)
+                    (or (= v :gameover)
+                        (= v :stop)))
+       (raf #(game-loop game-state comm-chan game-chan))))))
 
-(let [comm-chan (chan)]
-  (mainloop initial-game-state comm-chan (chan (sliding-buffer 10)))
+(let [comm-chan (chan)
+      game-chan (utils/merge-chans (click-chan ".new-game" :start)
+                                   (click-chan ".end-game" :stop))]
+  (go
+   (let [next-cmd (<! game-chan)]
+     (when (= :start next-cmd)
+       (game-loop initial-game-state comm-chan game-chan))
+     ))
   (bind-key-observer comm-chan))
-
 

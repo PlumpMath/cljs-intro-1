@@ -1,4 +1,8 @@
-(ns echocave.utils)
+(ns echocave.utils
+  (:require [cljs.core.async :as async
+             :refer [<! >! chan close! sliding-buffer put! alts! timeout]])
+  (:require-macros
+   [cljs.core.async.macros :refer [go alt!]]))
 
 ;; From
 ;; https://github.com/swannodette/async-tests/blob/master/src/async_test/utils/helpers.cljs
@@ -12,6 +16,15 @@
   (js-print args))
 
 (set! *print-fn* js-print)
+
+;; From http://rigsomelight.com/2013/07/18/clojurescript-core-async-todos.html
+(defn merge-chans [& chans]
+  (let [rc (chan)]
+    (go
+     (loop []
+       (put! rc (first (alts! chans)))
+       (recur)))
+    rc))
 
 (defn by-id [id] (dom/getElement id))
 
