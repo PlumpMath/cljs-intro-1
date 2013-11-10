@@ -50,7 +50,7 @@
 (defn bind-key-observer
   [command-chan]
   (go (while true
-;        (<! (timeout 10))
+        (<! (timeout 10)) Make the ship move as fast as the user can
         (case @current-key-down
           :up   (>! command-chan [:player/up])
           :down (>! command-chan [:player/down])
@@ -117,12 +117,12 @@
   [game-state direction]
   (condp = direction
     [:player/up]
-    (let [newy (dec (:shipy game-state))]
+    (let [newy (- (:shipy game-state) 2)]
       (if (< newy 0)
         game-state
         (assoc game-state :shipy newy)))
     [:player/down]
-    (let [newx (inc (:shipy game-state))]
+    (let [newx (+ (:shipy game-state) 2)]
       (if (> (+ utils/ship-height newx) utils/board-height)
         game-state
         (assoc game-state :shipy newx)))
