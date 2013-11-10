@@ -43,6 +43,8 @@
       40 :down
       87 :up
       83 :down
+      37 :left
+      39 :right
       nil)))
 
 ;; given a chan, every 25ms if a key is down, sends :player/up or
@@ -54,10 +56,11 @@
         (case @current-key-down
           :up   (>! command-chan [:player/up])
           :down (>! command-chan [:player/down])
+          :left (>! command-chan [:player/left])
+          :right (>! command-chan [:player/right])
           :not-matched)))
   (.addEventListener js/window "keydown"
                      (fn [e]
-                       ;(.log js/console e)
                        (reset! current-key-down (key-event->command e))))
   (.addEventListener js/window "keyup"
                      (fn [e]
@@ -131,7 +134,18 @@
     (let [newx (+ (:shipy game-state) 2)]
       (if (> (+ utils/ship-height newx) utils/board-height)
         game-state
-        (assoc game-state :shipy newx)))))
+        (assoc game-state :shipy newx)))
+    [:player/left]
+        (let [newx (- (:shipx game-state) 2)]
+      (if (< newx 0)
+        game-state
+        (assoc game-state :shipx newx)))
+    [:player/right]
+        (let [newx (+ (:shipx game-state) 2)]
+      (if (> (+ utils/ship-width newx) utils/board-width)
+        game-state
+        (assoc game-state :shipx newx)))
+    ))
 
 (defn check-collisions
   [game-state game-chan]
@@ -171,11 +185,9 @@
         ground-raw (atom (sorted-map))
         stretch-factor 4.0]
     (.beginPath ctx)
-;    (log "Board is:" (:ground game-state))
     ;; Translate to 0 from initial
     (.moveTo ctx 0 (get "loudness_start" begin))
     (loop [segments (rest ground)]
-;      (when-not (> @lastx utils/board-width))
       (let [segment (first segments)
             loudness (- utils/board-height (* 3.0 (Math/abs (get segment "loudness_start"))))]
         (swap! lastx + (* stretch-factor (get segment "duration")))
@@ -189,7 +201,6 @@
     ;; Draw the ship in its place
     (.drawImage ctx @ship (:shipx game-state) (:shipy game-state) 30 30)
     (assoc game-state :ground-raw @ground-raw)
-;    game-state
     ))
 
 ;; Main game loop
