@@ -108,7 +108,8 @@
 ;; Initial game state
 ;; TODO real data, initialize randomly for now
 (def ^:export initial-game-state
-  {:ground (vec (take utils/board-width (repeatedly #(rand-int (* 0.40 utils/board-height)))))
+  {:ground (vec (take utils/board-width
+                      (repeatedly #(- utils/board-height (rand-int (* 0.40 utils/board-height))))))
    :shipx 0
    :shipy 0})
 
@@ -125,11 +126,22 @@
     (let [newx (+ (:shipy game-state) 2)]
       (if (> (+ utils/ship-height newx) utils/board-height)
         game-state
-        (assoc game-state :shipy newx)))
-    ))
+        (assoc game-state :shipy newx)))))
+
+(defn check-collisions
+  [game-state game-chan]
+  ;; If the ship overlaps with the ground, game over
+  (let [ground-colls (filter (fn [x] ;; Check y pos at each x pos of the ship
+                               (>= (+ (:shipy game-state) utils/ship-height)
+                                   (nth (:ground game-state) x)))
+                             (range (:shipx game-state)
+                                    (+ (:shipx game-state) utils/ship-width)))]
+    (when-not (empty? ground-colls)
+      (log "GAME OVER" ground-colls)
+      (put! game-chan :gameover))))
 
 (defn update-game-state
-  [game-state comm-chan]
+  [game-state comm-chan game-chan]
   (go
    (let [s (atom game-state)]
      ;; Move ship if key is down
@@ -138,6 +150,8 @@
          (swap! s move-ship v)))
      ;; Shift the ground to the left
      (swap! s assoc :ground (<! (bg/update-ground (:ground game-state))))
+     ;; Check for collisions
+     (check-collisions game-state game-chan)
      @s)))
 
 (defn render-board
@@ -150,7 +164,7 @@
     (.beginPath ctx)
     (.moveTo ctx 0 (- utils/board-height (first ground)))
     (doall (map-indexed (fn [idx height]
-                          (.lineTo ctx idx (- utils/board-height height)))
+                          (.lineTo ctx idx height))
                         (rest ground)))
     (.stroke ctx)
     ;; Draw the ship in its place
@@ -161,18 +175,19 @@
 ;; * Use rAF to get called every 17ms
 ;; *
 (defn mainloop
-  [game-state comm-chan]
+  [game-state comm-chan game-chan]
   (go
    ;; Update game state
-   (let [game-state (<! (update-game-state game-state comm-chan))]
+   (let [game-state (<! (update-game-state game-state comm-chan game-chan))
+         [v c] (alts! [game-chan (timeout 0)])]
      ;; Render updated board
      (render-board game-state)
-     (raf #(mainloop game-state comm-chan)))
-   
-   ))
+    (when-not (and (= c game-chan)
+                   (= v :gameover))
+      (raf #(mainloop game-state comm-chan game-chan))))))
 
 (let [comm-chan (chan)]
-  (mainloop initial-game-state comm-chan)
+  (mainloop initial-game-state comm-chan (chan (sliding-buffer 10)))
   (bind-key-observer comm-chan))
 
 

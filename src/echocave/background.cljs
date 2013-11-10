@@ -17,7 +17,7 @@
 ;; Just make it random for now
 (go
  (while true
-   (>! ground-chan (rand-int (* 0.40 utils/board-height)))))
+   (>! ground-chan (- utils/board-height (rand-int (* 0.40 utils/board-height))))))
 
 (defn update-ground
   [ground-array]
