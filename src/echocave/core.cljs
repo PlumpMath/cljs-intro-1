@@ -167,19 +167,30 @@
   (let [ctx (board-context)
         ground (:ground game-state)
         begin (first ground)
-        lastx (atom 0.0)]
+        lastx (atom 0.0)
+        ground-raw (atom (sorted-map))
+        stretch-factor 4.0]
     (.beginPath ctx)
 ;    (log "Board is:" (:ground game-state))
     ;; Translate to 0 from initial
     (.moveTo ctx 0 (get "loudness_start" begin))
-    (doseq [segment (rest ground)]
-      (swap! lastx + (get segment "duration"))
-      (let [loudness (* 3.0 (Math/abs (get segment "loudness_start")))
-            loudness-bottom (- utils/board-height loudness)]
-        (.lineTo ctx @lastx loudness-bottom)))
+    (loop [segments (rest ground)]
+;      (when-not (> @lastx utils/board-width))
+      (let [segment (first segments)
+            loudness (- utils/board-height (* 3.0 (Math/abs (get segment "loudness_start"))))]
+        (swap! lastx + (* stretch-factor (get segment "duration")))
+        (.lineTo ctx @lastx loudness))
+      (when (and
+             (<= @lastx utils/board-width)
+             (seq (rest segments)))
+        (recur (rest segments)))
+      )
     (.stroke ctx)
     ;; Draw the ship in its place
-    (.drawImage ctx @ship (:shipx game-state) (:shipy game-state) 30 30)))
+    (.drawImage ctx @ship (:shipx game-state) (:shipy game-state) 30 30)
+    (assoc game-state :ground-raw @ground-raw)
+;    game-state
+    ))
 
 ;; Main game loop
 ;;
@@ -192,9 +203,9 @@
   (go
    ;; Update game state
    (let [game-state (<! (update-game-state game-state comm-chan game-chan))
-         [v c] (alts! [game-chan (timeout 0)])]
+         [v c] (alts! [game-chan (timeout 0)])
+         game-state (render-board game-state)]
      ;; Render updated board
-     (render-board game-state)
      ;; Check for end of game, either by user ending or collision
      (when-not (and (= c game-chan)
                     (or (= v :gameover)
@@ -206,7 +217,8 @@
   (go
    (log "Filling board")
    (let [board (atom (:ground game-state))]
-     (while (< (count @board) (* 4 utils/board-width))
+     (while (< (count @board) (* 2 utils/board-width)) ;; get 2000
+       ;; initial points to start
        (swap! board conj (<! (:bg-chan game-state))))
      (assoc game-state :ground @board))))
 

@@ -72,6 +72,7 @@
          (when-let [url (-> song
                             (get "audio_summary")
                             (get "analysis_url"))]
+           (log "Looking up analysis")
            (let [data (<! (GET url))
                  new-song (assoc-in song ["audio_summary" "analysis_result"] (js->clj (JSON/parse data)))]
              (>! out new-song))))))
