@@ -106,7 +106,11 @@
 ;;      (log "Got out: " (<! (net/fetch-song-analysis ids))))))
 
 ;; Initial game state
-(def ^:export initial-game-state {:ground (vec (take utils/board-width (repeatedly #(rand-int (* 0.20 utils/board-height)))))})
+;; TODO real data, initialize randomly for now
+(def ^:export initial-game-state
+  {:ground (vec (take utils/board-width (repeatedly #(rand-int (* 0.40 utils/board-height)))))
+   :shipx 0
+   :shipy 0})
 
 (defn update-game-state
   [game-state]
@@ -126,15 +130,14 @@
     (doall (map-indexed (fn [idx height]
                           (.lineTo ctx idx (- utils/board-height height)))
                         (rest ground)))
-    ;; (doseq [[idx height] (map-indexed (fn [i height] [i height]) (rest ground))]
-    ;;   (.lineTo ctx idx (0 utils/board-height height)))
-    (.stroke ctx))
-  )
+    (.stroke ctx)
+    ;; Draw the ship in its place
+    (.drawImage ctx @ship (:shipx game-state) (:shipy game-state) 30 30)))
 
 ;; Main game loop
 ;;
 ;; * Use rAF to get called every 17ms
-;; * 
+;; *
 (defn mainloop
   [game-state]
   (go
